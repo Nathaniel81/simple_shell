@@ -1,0 +1,27 @@
+.TH hsh 1 "August 2022" "1.0" "hsh - Simple Shell General Commands Manual"
+.SH NAME
+hsh - Simple Shell
+.SH SYNOPSIS
+.B hsh
+.I [OPTIONS] [FILE]
+.B Interactive mode
+.I [command_name][option_name][argument ...]
+.SH DESCRIPTION
+The simple shell is a program that accepts keyboard instructions and passes them on to the operating system. It includes several functions and typically runs other instructions. In general, an interactive shell prompts before each command, inspects parameters, executes them, and handles any failures. The basic shell receives input from a file in terms of lines and splits it up into words at whitespaces. 
+.SH EXAMPLES
+$ ./hsh
+ simple@shell $ /bin/ls
+ README.md execcmd.c shell.h main.c prompt.c
+ simple@shell $
+ simple@shell $ exit
+ $
+.PP
+ $ echo "/bin/ls" | ./hsh
+ README.md execcmd.c shell.h main.c _getline.c
+ $
+.SH SEE ALSO
+sh(1)
+.SH BUGS
+No BUGS
+.SH AUTHORS
+Written by Natnael Endale & Nathaniel Demissie
