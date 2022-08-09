@@ -1,109 +1,140 @@
 #include "shell.h"
 
-void cd_helper(void);
-void exit_helper(void);
-void alias_helper(void);
-void _helper(void);
-void help_all(void);
+void signalHandler(int sig);
+int execute(char **args, char **front);
 
 /**
- * help_all - Displays all possible builtin commands.
+ * signalHandler - Avoids current process to finish and prints a new prompt.
+ * @sig: The signal recieved.
  *
  */
 
-void help_all(void)
+void signalHandler(int sig)
 {
-	char *msg = "Shellby\nThese shell commands are defined internally.\n";
+	char *new_prompt = "\n#cisfun$ ";
 
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "Type 'help' to see this list.\nType 'help name' to find ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "out more about the function 'name'.\n\n  alias   \t";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "alias [NAME[='VALUE'] ...]\n  cd    \tcd   ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "[DIRECTORY]\n  exit    \texit [STATUS]\n  env     \tenv";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "\n  setenv  \tsetenv [VARIABLE] [VALUE]\n  unsetenv\t";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "unsetenv [VARIABLE]\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
+	(void)sig;
+	signal(SIGINT, signalHandler);
+	write(STDIN_FILENO, new_prompt, 10);
 }
 
 /**
- * alias_helper - Displays information on the builtin command 'alias'.
+ * execute - Executes a command in the child process.
+ * @args: An array of arguments.
+ * @front: A double pointer that points to the first args.
+ *
+ * Return: The exit value of the last executed command.
+ * or a corresponding error code, on error.
  *
  */
 
-void alias_helper(void)
+int execute(char **args, char **front)
 {
-	char *msg = "alias: alias [NAME[='VALUE'] ...]\n\tHandles aliases.\n";
+	pid_t child_pid;
+	char *cmd = args[0];
+	int status, flag = 0;
+	int ret = 0;
 
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "\n\talias: Prints a list of all aliases, one per line, in ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "the format NAME='VALUE'.\n\talias name [name2 ...]:prints";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " the aliases name, name2, etc. one per line, in the ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "form NAME='VALUE'.\n\talias NAME='VALUE' [...]: Defines";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " an alias for each NAME whose VALUE is given. If NAME ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "is already an alias, replace its value with VALUE.\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
+	if (cmd[0] != '/' && cmd[0] != '.')
+	{
+		flag = 1;
+		cmd = get_cmd(cmd);
+	}
+	if (!cmd || (access(cmd, F_OK) == -1))
+	{
+		if (errno == EACCES)
+			ret = (custom_err(args, 126));
+		else
+			ret = (custom_err(args, 127));
+	}
+	else
+	{
+		child_pid = fork();
+		if (child_pid == -1)
+		{
+			if (flag)
+				free(cmd);
+			perror("Error child:");
+			return (1);
+		}
+		if (child_pid == 0)
+		{
+			execve(cmd, args, environ);
+			if (errno == EACCES)
+				ret = (custom_err(args, 126));
+			free_env();
+			free_args(args, front);
+			free_alias_list(aliases);
+			_exit(ret);
+		}
+		else
+		{
+			wait(&status);
+			ret = WEXITSTATUS(status);
+		}
+	}
+	if (flag)
+		free(cmd);
+	return (ret);
 }
 
 /**
- * cd_helper - Displays information on the shellby command 'cd'.
+ * main - Entry point
+ * @argc: Argument Counter
+ * @argv: Argument Vector
  *
- */
-void cd_helper(void)
-{
-	char *msg = "cd: cd [DIRECTORY]\n\tChanges the current directory of the";
-
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " process to DIRECTORY.\n\n\tIf no argument is given, the ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "command is interpreted as cd $HOME. If the argument '-' is";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " given, the command is interpreted as cd $OLDPWD.\n\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "\tThe environment variables PWD and OLDPWD are updated ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "after a change of directory.\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-}
-
-/**
- * exit_helper - Displays information on the builtin command 'exit'.
- *
- */
-void exit_helper(void)
-{
-	char *msg = "exit: exit [STATUS]\n\tExits the shell.\n\n\tThe ";
-
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "STATUS argument is the integer used to exit the shell.";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " If no argument is given, the command is interpreted as";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = " exit 0.\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-}
-
-/**
- * _helper - Displays information on the builtin command 'help'.
- *
+ * Return: 0 on success
  */
 
-void _helper(void)
+int main(int argc, char **argv)
 {
-	char *msg = "help: help\n\tSee all possible Shellby builtin commands.\n";
+	int ret = 0, rtn;
+	int *exec_rtn = &rtn;
+	char *prompt = "#cisfun$ ", *new_line = "\n";
 
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "\n      help [BUILTIN NAME]\n\tSee specific information on each ";
-	write(STDOUT_FILENO, msg, _strlen(msg));
-	msg = "builtin command.\n";
-	write(STDOUT_FILENO, msg, _strlen(msg));
+	name = argv[0];
+	hist = 1;
+	aliases = NULL;
+	signal(SIGINT, signalHandler);
+
+	*exec_rtn = 0;
+	environ = cpyenv();
+	if (environ == NULL)
+		exit(-100);
+
+	if (argc != 1)
+	{
+		ret = proc_file_commands(argv[1], exec_rtn);
+		free_env();
+		free_alias_list(aliases);
+		return (*exec_rtn);
+	}
+
+	if (isatty(STDIN_FILENO) == 0)
+	{
+		while (ret != END_OF_FILE && ret != EXIT)
+			ret = arg_handler(exec_rtn);
+		free_env();
+		free_alias_list(aliases);
+
+		return (*exec_rtn);
+	}
+
+	while (1)
+	{
+		write(STDOUT_FILENO, prompt, 9);
+		ret = arg_handler(exec_rtn);
+		if (ret == END_OF_FILE || ret == EXIT)
+		{
+			if (ret == END_OF_FILE)
+				write(STDOUT_FILENO, new_line, 1);
+			free_env();
+			free_alias_list(aliases);
+			exit(*exec_rtn);
+		}
+	}
+
+	free_env();
+	free_alias_list(aliases);
+	return (*exec_rtn);
 }
